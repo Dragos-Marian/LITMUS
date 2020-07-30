@@ -4,10 +4,16 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
-char filename[100];
-char file[100];
-char rfile[100];
-void createReservation(int core,int hyper_per,int sTime,int period,int wcet)
+#include <dirent.h>
+
+#define CRIT1 "1.txt"
+#define CRIT2 "2.txt"
+#define CRIT3 "3.txt"
+#define RES "res_"
+#define RT "rt_"
+#define TRACE "my-trace"
+
+void createReservation(int critLevel,int core,int hyper_per,int sTime,int period,int wcet)
 {
     static char const res[]="resctl -n ";
   static char const res2[]=" -c 1 -t table-driven -m ";
@@ -16,7 +22,8 @@ void createReservation(int core,int hyper_per,int sTime,int period,int wcet)
   static char const i3[]=")";
   static char const i4[]=",";
   static char const i5[]=" ";
-	int interval[hyper_per/period+1];
+	
+	int interval[50];
 	char resctl[100];
 	char append[10];
 	char app2[10];
@@ -33,9 +40,9 @@ void createReservation(int core,int hyper_per,int sTime,int period,int wcet)
 	    interval[j+k]=j*period+sTime+wcet;
 	    k++;
 	    }
-	
         for(int i=0;i<hyper_per/period *2;i++)
 	{
+	
 		char app3[10];
 		if(i%2==0)
 		{
@@ -55,6 +62,13 @@ void createReservation(int core,int hyper_per,int sTime,int period,int wcet)
 	}
  	strcat(resctl,"\n");
 	size_t twrite=sizeof resctl;
+	//printf("%s\n",resctl);
+	char filename[100];
+	char convert[10];
+	sprintf(convert,"%d",critLevel);
+	strcpy(filename,RES);
+	strcat(filename,convert);
+	strcat(filename,".sh");
 	FILE * f=fopen(filename,"a");
       	fprintf(f,resctl);
     fclose(f);
@@ -63,7 +77,7 @@ void createReservation(int core,int hyper_per,int sTime,int period,int wcet)
   
 
 }
-void createRTSPIN(int core,int period,int wcet)
+void createRTSPIN(int critLevel,int core,int period,int wcet)
 {
  	static const char rt[]="rtspin -w -p 1 -r ";
 	static const char end[]=" 1 & \n";
@@ -79,7 +93,13 @@ void createRTSPIN(int core,int period,int wcet)
 	strcat(rtspin,i1);
 	strcat(rtspin,app2);
 	strcat(rtspin,end);
-	FILE * f=fopen(rfile,"a");
+	char rtfile[100];
+	char convert[10];
+	sprintf(convert,"%d",critLevel);
+	strcpy(rtfile,RT);
+	strcat(rtfile,convert);
+	strcat(rtfile,".sh");
+	FILE * f=fopen(rtfile,"a");
       	fprintf(f,rtspin);
     fclose(f);
 	
@@ -97,20 +117,59 @@ int main(int argc,char *argv[])
 	static char const rt_set[]="#!/bin/sh \n\n";
 	size_t twrite=sizeof cres_setsched ;
 	size_t rwrite=sizeof rt_set ;
-    printf("Give reservation filename \n");
-    scanf("%s",filename);
-    FILE * f=fopen(filename,"w+");
-      fwrite(cres_setsched,1,twrite-1,f);
+
+
+	int filecnt=0;
+	char cwd[256];
+  	if(getcwd(cwd,sizeof(cwd))!=NULL)
+	{
+	DIR *dir;
+	struct dirent *entry;
+	if((dir=opendir(cwd))==NULL)
+
+		{
+			perror("Couldn't open dir");
+			exit(10);
+		}
+	while((entry=readdir(dir))!=NULL)
+	{
+	 	if((entry->d_type==DT_REG) && (strcmp(entry->d_name,CRIT1)==0)|| (strcmp(entry->d_name,CRIT2)==0)|| (strcmp(entry->d_name,CRIT3)==0))
+		{
+			filecnt++; 
+		}
 		
+	}
+	closedir(dir);
+	}
+
+	int critLevel;
+	for(critLevel=1;critLevel<=filecnt;critLevel++)
+	{
+
+		char resfile[100],rtfile[100],inputfile[100],convert[10];
+		strcpy(resfile,RES);
+		sprintf(convert,"%d",critLevel);
+		strcat(resfile,convert);
+		strcat(resfile,".sh");
+		
+		strcpy(rtfile,RT);
+		strcat(rtfile,convert);
+		strcat(rtfile,".sh");
+
+		strcpy(inputfile,convert);
+		strcat(inputfile,".txt");
+
+    
+    FILE * f=fopen(resfile,"w+");
+      fwrite(cres_setsched,1,twrite-1,f);	
     fclose(f);
-	printf("Give rtspin filename \n");
-    scanf("%s",rfile);
-    FILE * fp=fopen(rfile,"w+");
+	
+    FILE * fp=fopen(rtfile,"w+");
       fwrite(rt_set,1,rwrite-1,fp);
     fclose(fp);
-	printf("Give input filename \n");
-	scanf("%s",file);
-	FILE *FP=fopen(file,"r");
+
+	
+	FILE *FP=fopen(inputfile,"r");
 		char buff[100],ch;
 		int howMany,hyper_per,i=0,arr[100],j=0;
 	while(1)
@@ -168,25 +227,25 @@ int main(int argc,char *argv[])
 	
 	for(int i=0;i<howMany;i++)
 	{
-  	 createReservation(core[i],hyper_per,sTime[i],period[i],wcet[i]);
-	 createRTSPIN(core[i],period[i],wcet[i]);
+  	 createReservation(critLevel,core[i],hyper_per,sTime[i],period[i],wcet[i]);
+	 createRTSPIN(critLevel,core[i],period[i],wcet[i]);
 	}
-	char c[2];
-	printf("If you want to run st-trace press y/n \n");
-	scanf("%s",c);
-	const char s[]="y";
+		const char s[]="1";
+		char c[2];
+		strcpy(c,argv[critLevel]);
 		if(strcmp(c,s)==0)
 		 {
-			FILE * ft=fopen(filename,"a");
-			char name[100],setsched[100];
-			printf("Give the name of the trace \n");
-			scanf("%s",name);
+			FILE * ft=fopen(resfile,"a");
+			char setsched[100];
 			strcpy(setsched,st_trace);
-			strcat(setsched,name);
+			strcat(setsched,TRACE);
 			strcat(setsched,"\n\n");
 			size_t swrite=sizeof setsched ;
 			fprintf(f,setsched);
+			
 		 }
+		
+	}
   // executeRes();
   return 0;
 }
