@@ -1,0 +1,51 @@
+Create new sporadic polling with id 123 on core 1:
+resctl -n 123 -t polling-sporadic -c 1
+
+Create sporadic polling with id 234 on core 1 with budget (-b) 25ms and
+replenishment period (-p) 50ms:
+resctl -n 234 -t polling-sporadic -c 1 -b 25 -p 50
+
+Built help:
+resctl -h
+
+DON'T FORGET !!!!!!!! : Tasks are not assigned priorities directly.USE -q 
+with resctl FOR ASSIGNED PRIORITIES TO RESERVATIONS.
+
+RTSPIN- Simulate a periodic CPU -bound real time task 
+WCET -Worst case exec time (ms)
+PERIOD-(ms)
+TASK EXEC TIME-(s)
+RTSPIN (PERIOD) (CORE) (ID) (ID_NUMBER) (WCET) (PERIOD) (TASK EXEC TIME)
+-v : (?; attach with an id?) !!!
+
+Create rtspin with 30 wcet,50 period and execution time of 5 seconds.Attach it to the previous res(id 234) on core 1.
+rtspin -v -p 1 -r 234 30 50 5
+
+Create rtspin with 25 wcet,40 period and execution time of 5 seconds.Attach it to the previous res(id 234, p 50) on core 1.
+rtspin -v -p 1 -r 234 25 40 5
+
+
+Table driven:
+-used to implement time partitioning
+
+Major Cycle(M):
+-Period of the scheduling table (schedule repeat at M ms)
+
+Schedule slot:
+-non-overlapping intervals relative to the start of the Major Cycle
+
+Create table driven on core 1 with id 100, Major Cycle 200ms and schedule slots on alternative 50ms, and one on core 1 with id 101, Major Cycle 200ms and schedule slots on alternative 50ms.
+resctl -n 100 -c 1 -t table-driven -m 200 '[0,50)' '[100,150)'
+resctl -n 101 -c 1 -t table-driven -m 200 '[50,100)' '[150,200)'
+
+!!!!!
+resctl wont give error if slots across multiple Major reservation overlap.So it can have different Major cycles if the slots wont overlap.
+
+
+Create 3 table driven with major cycle 200, on core 1, non-overlapping slots
+resctl -n 100 -c 1 -t table-driven -m 200 '[0,50)' '[100,150)'
+resctl -n 101 -c 1 -t table-driven -m 200 '[50,100)' 
+resctl -n 102 -c 1 -t table-driven -m 200 '[100,150)'
+
+
+
